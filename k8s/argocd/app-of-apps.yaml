@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_USERNAME/YOUR_INFRA_REPO.git
+    repoURL: https://github.com/NikolayZdravkov/knowledgebase-infra.git
     targetRevision: HEAD
     path: k8s/apps
   destination:

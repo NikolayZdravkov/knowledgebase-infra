@@ -22,17 +22,35 @@ if [ -z "$HCLOUD_TOKEN" ]; then
   exit 1
 fi
 
-echo ">>> Creating localadmin user..."
-ansible-playbook -i "$INVENTORY" ansible/playbooks/create-localadmin-user.yml -e ansible_user=root
+INIT_ONLY=false
+SKIP_INIT=false
+ARGOCD_ONLY=false
 
-echo ">>> Hardening server..."
-ansible-playbook -i "$INVENTORY" ansible/playbooks/harden.yml -e ansible_user=root
+for arg in "$@"; do
+  case $arg in
+    --init-only)   INIT_ONLY=true ;;
+    --skip-init)   SKIP_INIT=true ;;
+    --argocd-only) ARGOCD_ONLY=true ;;
+  esac
+done
 
-echo ">>> Deploying k3s..."
-ansible-playbook -i "$INVENTORY" ansible/playbooks/deploy_k3s.yaml
+if [ "$ARGOCD_ONLY" = false ] && [ "$SKIP_INIT" = false ]; then
+  echo ">>> Creating localadmin user..."
+  ansible-playbook -i "$INVENTORY" ansible/playbooks/create-localadmin-user.yml -e ansible_user=root
 
-echo ">>> Deploying ArgoCD..."
-ansible-playbook -i "$INVENTORY" ansible/playbooks/deploy_argocd.yaml
+  echo ">>> Hardening server..."
+  ansible-playbook -i "$INVENTORY" ansible/playbooks/harden.yml -e ansible_user=root
+fi
+
+if [ "$INIT_ONLY" = false ] && [ "$ARGOCD_ONLY" = false ]; then
+  echo ">>> Deploying k3s..."
+  ansible-playbook -i "$INVENTORY" ansible/playbooks/deploy_k3s.yaml
+fi
+
+if [ "$INIT_ONLY" = false ]; then
+  echo ">>> Deploying ArgoCD..."
+  ansible-playbook -i "$INVENTORY" ansible/playbooks/deploy_argocd.yaml
+fi
 
 echo ">>> Done."
 

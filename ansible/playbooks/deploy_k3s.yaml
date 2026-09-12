@@ -1,0 +1,12 @@
+---
+- name: Prerequisites
+  hosts: kubernetes
+  become: true
+  roles:
+    - role: k3s.orchestration.prereq
+
+- name: Install k3s server
+  hosts: kubernetes
+  become: true
+  roles:
+    - role: k3s.orchestration.k3s_server

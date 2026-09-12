@@ -1,0 +1,7 @@
+plugin: hetzner.hcloud.hcloud
+
+connect_with: public_ipv4
+
+groups:
+  kubernetes: "'homelab-node' in inventory_hostname"
+

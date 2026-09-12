@@ -1,0 +1,21 @@
+- name: Create localadmin user
+  hosts: kubernetes
+  become: true
+
+  vars:
+    ansible_public_key: "{{ lookup('file', '~/.ssh/mlops_key.pub') }}"
+
+  tasks:
+    - name: Create localadmin user
+      ansible.builtin.user:
+        name: localadmin
+        shell: /bin/bash
+        groups: sudo
+        append: true
+        state: present
+
+    - name: Add SSH key for localadmin
+      ansible.posix.authorized_key:
+        user: localadmin
+        key: "{{ ansible_public_key }}"
+        state: present

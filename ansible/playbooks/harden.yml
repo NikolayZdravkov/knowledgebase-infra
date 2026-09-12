@@ -1,0 +1,119 @@
+- name: Harden Node
+  hosts: kubernetes
+  become: true
+
+  vars:
+    ansible_public_key: "{{ lookup('file', '~/.ssh/mlops_key.pub') }}"
+
+  tasks:
+    #--- Non-root sudo user --
+    - name: Create ansible user
+      ansible.builtin.user:
+        name: ansible
+        shell: /bin/bash
+        groups: sudo 
+        append: true
+        state: present
+
+    - name: Add SSH key for ansible user
+      ansible.posix.authorized_key:
+        user: ansible
+        key: "{{ ansible_public_key }}"
+        state: present
+
+    - name: Allow ansible passwordless sudo
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/ansible
+        line: "ansible ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        validate: "visudo -cf %s"
+        mode: "0440"
+
+    - name: Allow localadmin passwordless sudo
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/localadmin
+        line: "localadmin ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        validate: "visudo -cf %s"
+        mode: "0440"
+
+    # --- SSH Hardening ---
+
+    - name: Harden sshd config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?LoginGraceTime', line: 'LoginGraceTime 30' }
+        - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+      notify: Restart sshd
+
+    # --- fail2ban---
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+        update_cache: true
+
+    - name: Configure fail2ban SSH jail
+      ansible.builtin.copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [sshd]
+          enabled = true
+          maxretry = 5
+          bantime = 3600
+          findtime = 600
+        mode: "0644"
+      notify: Restart fail2ban
+
+    #---Unattended upgrades---
+    - name: Install unattended-upgrades
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: present
+
+    - name: Enable automatic security updates
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+           APT::Periodic::Update-Package-Lists "1";                  
+           APT::Periodic::Unattended-Upgrade "1";
+        mode: "0644"
+
+    #---sysctl hardening---
+    - name: Apply sysctl hardening
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
+      loop:
+        - { name: net.ipv4.tcp_syncookies, value: '1' }
+        - { name: net.ipv4.icmp_echo_ignore_broadcasts, value: '1' }
+        - { name: net.ipv4.conf.all.accept_source_route, value: '0' }
+        - { name: net.ipv4.conf.all.rp_filter, value: '1' } 
+        - { name: net.ipv4.conf.default.rp_filter, value: '1' }   
+
+    #---AppArmor---
+    - name: Ensure AppArmor is enabled and running
+      ansible.builtin.service:
+        name: apparmor
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: Restart fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted

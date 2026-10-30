@@ -6,5 +6,15 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~> 1.60" 
     }
+
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.27"
+    }
   }
 }

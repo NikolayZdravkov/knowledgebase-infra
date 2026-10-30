@@ -36,9 +36,6 @@ api:
   dashboard: true
   insecure: true
 
-deployment:
-  podAnnotations: {}
-
 securityContext:
   capabilities:
     add:
